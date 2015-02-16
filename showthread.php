@@ -533,7 +533,7 @@ if($mybb->input['action'] == "thread")
 					$percent = number_format($votes / $poll['totvotes'] * 100, 2);
 				}
 				$imagewidth = round($percent);
-                // Poll Votes Colors
+                // Color en Encuestas
                 if ($percent == 20 || $percent < 20 && $percent > 0)
                 {
                     $pollbg = '#D9534F';
