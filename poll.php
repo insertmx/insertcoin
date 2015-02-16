@@ -863,7 +863,7 @@ if($mybb->input['action'] == "showresults")
 				}
 			}
 		}
-                // Poll Votes Colors
+                // Agregar Color a Encuestas
                 if ($percent == 20 || $percent < 20 && $percent > 0)
                 {
                     $pollbg = '#D9534F';
