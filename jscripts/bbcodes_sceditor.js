@@ -164,6 +164,22 @@ $(document).ready(function($) {
 			var	author = '',
 				$elm  = $(element),
 				$cite = $elm.children('cite').first();
+		//spoiler
+	                if ($(element[0]).hasClass('spoiler')) {
+                        var desc = '';
+                        if($cite.length === 1 || $elm.data('desc')) {
+                        desc = $elm.data('desc') || $cite.text() ;
+
+                        $elm.data('desc', desc);
+                        $cite.remove();
+
+                content = this.elementToBbcode($(element));
+                        desc  = '=' + desc;
+
+                $elm.prepend($cite);
+            }
+                return '[spoiler' + desc + ']' + content + '[/spoiler]';
+            }  			
 				$cite.html($cite.text());
 
 			if($cite.length === 1 || $elm.data('author'))
@@ -415,7 +431,90 @@ $(document).ready(function($) {
 		}
 	});
 
+       /***************************************
+        * Mention Me Button *
+        ***************************************/
+        $.sceditor.command.set('mention', {
+            _dropDown: function (editor, caller) {
+            var $content;
 
+            $content = $(
+                '<div>' +
+                    '<label for="names">' + editor._('Usuarios a Mencionar:') + '</label> ' +
+                    '<input type="text" id="names" />' +                    
+                '</div>' +
+                '<div><input type="button" class="button" value="' + editor._('Insert') + '" /></div>'
+            );
+
+            $content.find('.button').click(function (e) {
+                var    val = $content.find('#names').val();
+                var array = val.split(',');
+
+                if(val) {
+                    // needed for IE to reset the last range
+                    editor.focus();
+                        $.each(array, function(index, value ){
+                            if(value.replace(/\s/g, '') != "")
+                            {
+                                var text = value.replace(/,\s?/g, ", "),
+                                    id = value.replace(/,\s?/g, ", ");
+                                editor.wysiwygEditorInsertHtml('@"' + text + '" ');    
+                                
+                            }
+                        });
+                    }
+                
+                editor.closeDropDown(true);
+                e.preventDefault();
+            });
+
+            editor.createDropDown(caller, 'insertmention', $content);
+        },
+        exec: function (caller) {
+            $.sceditor.command.get('mention')._dropDown(this, caller);
+            MyBB.select2();
+            $("#names").select2({
+                placeholder: "Buscar Usuario",
+                minimumInputLength: 3,
+                maximumSelectionSize: 25,
+                multiple: true,
+                ajax: { // instead of writing the function to execute the request we use Select2's convenient helper
+                    url: "xmlhttp.php?action=get_users",
+                    dataType: 'json',
+                    data: function (term, page) {
+                        return {
+                            query: term, // search term
+                        };
+                    },
+                    results: function (data, page) { // parse the results into the format expected by Select2.
+                        // since we are using custom formatting functions we do not need to alter remote JSON data
+                        return {results: data};
+                    }
+                },
+                initSelection: function(element, callback) {
+                    var query = $(element).val();
+                    if (query !== "") {
+                        var newqueries = [];
+                        exp_queries = query.split(",");
+                        $.each(exp_queries, function(index, value ){
+                            if(value.replace(/\s/g, '') != "")
+                            {
+                                var newquery = {
+                                    id: value.replace(/,\s?/g, ", "),
+                                    text: value.replace(/,\s?/g, ", ")
+                                };
+                                newqueries.push(newquery);
+                            }
+                        });
+                        callback(newqueries);
+                    }
+                }
+            });
+
+        },
+        txtExec: ['@'],
+        tooltip: 'Mencionar'
+        });
 
 	/**************************
 	 * Add MyBB video command *
@@ -535,6 +634,109 @@ $(document).ready(function($) {
 		},
 		tooltip: 'Insert a video'
 	});
+	
+	
+        /***********************
+         * Add Spoiler command *
+         ***********************/
+        $.sceditor.plugins.bbcode.bbcode.set("spoiler", {
+                allowsEmpty: true,
+                isInline: false,    
+                format: function(element, content) {
+            var desc = '',
+                $elm = $(element),
+                $cite = $elm.children('cite').first();
+
+            if($cite.length === 1 || $elm.data('desc')) {
+                desc = $elm.data('desc') || $cite.text() ;
+
+                $elm.data('desc', desc);
+                $cite.remove();
+
+                content = this.elementToBbcode($(element));
+                desc = '=' + desc;
+
+                $elm.prepend($cite);
+            }
+
+            return '[spoiler' + desc + ']' + content + '[/spoiler]';
+        },
+            html: function (token, attrs, content) {
+               var data = '';
+            
+            if (attrs.defaultattr) {
+                content = '<cite>' + attrs.defaultattr + '</cite>' + content;
+            data += ' data-desc="' + attrs.defaultattr + '"';
+            }
+                
+            return '<blockquote' + data + ' class="spoiler">' + content + '</blockquote>';
+        },
+        breakStart: true,
+        breakEnd: true
+        });
+    
+        $.sceditor.command.set("spoiler", {
+        _dropDown: function (editor, caller, html) {
+            var $content;
+
+            $content = $(
+                '<div>' +
+                    '<label for="des">' + editor._('Description (optional):') + '</label> ' +
+                    '<input type="text" id="des" />' +
+                '</div>' +
+                '<div><input type="button" class="button" value="' + editor._('Insert') + '" /></div>'
+            );
+
+            $content.find('.button').click(function (e) {
+                var    description = $content.find('#des').val(),
+                    descriptionAttr = '',
+                    before = '[spoiler]',
+                    end = '[/spoiler]';
+                
+                if (description) {
+                   descriptionAttr = '=' + description + '';
+                   before = '[spoiler'+ descriptionAttr +']';
+                }
+                
+                if (html) {
+                    before = before + html + end;
+                    end    = null;
+                }
+                
+                editor.insert(before, end);
+                editor.closeDropDown(true);
+                e.preventDefault();
+            });
+
+            editor.createDropDown(caller, 'insertspoiler', $content);
+        },        
+        exec: function (caller) {
+            $.sceditor.command.get('spoiler')._dropDown(this, caller);
+        },
+        txtExec: function (caller) {
+            $.sceditor.command.get('spoiler')._dropDown(this, caller);
+        },
+         tooltip: 'Insertar spoiler'
+        }); 
+
+        /*********************
+         * Add imgur command *
+        *********************/
+             	$.sceditor.command.set("imgur", {
+             	_imgur: function () {
+ 		document.querySelector('textarea').insertAdjacentHTML( 'afterEnd', '<input class="imgur" style="visibility:hidden;position:absolute;top:0;" type="file" onchange="upload(this.files[0])" accept="image/*">' );
+ 		document.querySelector('input.imgur').click();
+ 	},
+ 		exec: function () 
+ 	{
+ 		$.sceditor.command.get('imgur')._imgur();
+ 	},
+ 		txtExec: function() 
+ 	{
+ 		$.sceditor.command.get('imgur')._imgur();
+ 	},		
+ 		tooltip: 'Subir a Imgur'
+ 		}); 
 
 
 
@@ -553,7 +755,7 @@ $(document).ready(function($) {
 	 * Remove code and quote if in partial mode *
 	 ********************************************/
 	if(partialmode) {
-		$.sceditor.plugins.bbcode.bbcode.remove('code').remove('php').remove('quote').remove('video').remove('img');
+		$.sceditor.plugins.bbcode.bbcode.remove('code').remove('php').remove('quote').remove('video').remove('img').remove('spoiler';
 		$.sceditor.command
 			.set('image', {
 				exec:  function (caller) {
@@ -598,3 +800,34 @@ $(document).ready(function($) {
 			});
 	}
 });
+
+        /*****************************
+ 	* Add imgur upload function *
+ 	*****************************/
+ 	function upload(file) {
+
+ 	/* Is the file an image? */
+ 	if (!file || !file.type.match(/image.*/)) return;
+ 
+ 	/* It is! */
+ 	document.body.className = "uploading";
+ 	var d = document.querySelector(".sceditor-button-imgur div");
+ 	d.className = d.className + " imgurup";
+ 
+ 	/* Lets build a FormData object*/
+ 	var fd = new FormData(); // I wrote about it: https://hacks.mozilla.org/2011/01/how-to-develop-a-html5-image-uploader/
+ 	fd.append("image", file); // Append the file
+ 	var xhr = new XMLHttpRequest(); // Create the XHR (Cross-Domain XHR FTW!!!) Thank you sooooo much imgur.com
+ 	xhr.open("POST", "https://api.imgur.com/3/image.json"); // Boooom!
+ 	xhr.onload = function() {
+ 	var code = '[img]' + JSON.parse(xhr.responseText).data.link + '[/img]';
+ 	$('#message, #signature, textarea[name*="value"]').data('sceditor').insert(code);
+ 	var d = document.querySelector(".sceditor-button-imgur div.imgurup");
+ 	d.className = d.className - " imgurup";
+ 	document.querySelector('input.imgur').remove();
+ 	}
+ 	// Ok, I don't handle the errors. An exercice for the reader.
+ 	xhr.setRequestHeader('Authorization', 'Client-ID 2fad2e5fe8bf4fb');
+ 	/* And now, we send the formdata */
+ 	xhr.send(fd);
+ }; 
